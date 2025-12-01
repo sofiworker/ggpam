@@ -8,6 +8,8 @@ package main
 #include <syslog.h>
 #include <stdlib.h>
 
+typedef const char *pam_const_char;
+
 static int prompt_wrapper(pam_handle_t *pamh, int style, char **resp, const char *text) {
 	return pam_prompt(pamh, style, resp, "%s", text);
 }
@@ -18,17 +20,6 @@ static void error_wrapper(pam_handle_t *pamh, const char *text) {
 
 static void syslog_wrapper(pam_handle_t *pamh, int priority, const char *text) {
 	pam_syslog(pamh, priority, "%s", text);
-}
-
-int goPamAuthenticate(pam_handle_t *pamh, int flags, int argc, char **argv);
-int goPamSetcred(pam_handle_t *pamh, int flags, int argc, char **argv);
-
-int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
-	return goPamAuthenticate(pamh, flags, argc, (char **)argv);
-}
-
-int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
-	return goPamSetcred(pamh, flags, argc, (char **)argv);
 }
 */
 import "C"
@@ -55,18 +46,26 @@ var (
 	fallbackUser = "nobody"
 )
 
-//export goPamAuthenticate
+//export pam_sm_authenticate
+func pam_sm_authenticate(pamh *C.pam_handle_t, flags C.int, argc C.int, argv *C.pam_const_char) C.int {
+	return goPamAuthenticate(pamh, flags, argc, (**C.char)(unsafe.Pointer(argv)))
+}
+
+//export pam_sm_setcred
+func pam_sm_setcred(pamh *C.pam_handle_t, flags C.int, argc C.int, argv *C.pam_const_char) C.int {
+	return goPamSetcred(pamh, flags, argc, (**C.char)(unsafe.Pointer(argv)))
+}
+
 func goPamAuthenticate(pamh *C.pam_handle_t, flags C.int, argc C.int, argv **C.char) C.int {
 	args := parsePamArgs(argc, argv)
 	params, err := pamcfg.ParseParams(args)
 	if err != nil {
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("参数错误: %v", err))
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgInvalidArgs, err))
 		return C.PAM_SERVICE_ERR
 	}
 	return runPamAuth(pamh, params)
 }
 
-//export goPamSetcred
 func goPamSetcred(pamh *C.pam_handle_t, flags C.int, argc C.int, argv **C.char) C.int {
 	return C.PAM_SUCCESS
 }
@@ -84,9 +83,9 @@ func runPamAuth(pamh *C.pam_handle_t, params pamcfg.Params) C.int {
 
 	account, err := lookupAccount(targetUser)
 	if err != nil {
-		pamSyslog(pamh, C.LOG_WARNING, fmt.Sprintf("无法定位用户 %s: %v", targetUser, err))
+		pamSyslog(pamh, C.LOG_WARNING, msgf(msgUserLookupFailed, targetUser, err))
 		if fallback, ferr := lookupAccount(fallbackUser); ferr == nil {
-			pamSyslog(pamh, C.LOG_INFO, fmt.Sprintf("fallback to user %s for file access", fallbackUser))
+			pamSyslog(pamh, C.LOG_INFO, msgf(msgFallbackUser, fallbackUser))
 			account = fallback
 		} else {
 			return C.PAM_SERVICE_ERR
@@ -95,14 +94,14 @@ func runPamAuth(pamh *C.pam_handle_t, params pamcfg.Params) C.int {
 
 	privState, err := dropPrivileges(account)
 	if err != nil {
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("无法降级到用户 %s: %v", account.Username, err))
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgDropPrivilegesFailed, account.Username, err))
 		return C.PAM_SERVICE_ERR
 	}
 	defer restorePrivileges(privState)
 
 	secretPath, err := pamcfg.ResolveSecretPath(params.SecretSpec, account)
 	if err != nil {
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("无法解析 secret: %v", err))
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgResolveSecretFailed, err))
 		return C.PAM_SERVICE_ERR
 	}
 	pamDebugf(pamh, params, "using secret file %s", secretPath)
@@ -110,11 +109,11 @@ func runPamAuth(pamh *C.pam_handle_t, params pamcfg.Params) C.int {
 	cfg, state, err := pamcfg.LoadConfig(account, secretPath, params)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) && params.NullOK {
-			pamSyslog(pamh, C.LOG_INFO, fmt.Sprintf("用户 %s 未配置密钥，nullok 生效", targetUser))
+			pamSyslog(pamh, C.LOG_INFO, msgf(msgUserNoSecretNullOK, targetUser))
 			return C.PAM_IGNORE
 		}
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("读取 %s 失败: %v", secretPath, err))
-		pamError(pamh, "无法读取 Google Authenticator 配置")
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgReadConfigFailed, secretPath, err))
+		pamError(pamh, msgf(msgReadConfigFailed, secretPath, err))
 		return C.PAM_AUTH_ERR
 	}
 
@@ -125,14 +124,14 @@ func runPamAuth(pamh *C.pam_handle_t, params pamcfg.Params) C.int {
 	if params.PromptTemplate != "" {
 		rendered, err := preparePromptFromTemplate(pamh, params.PromptTemplate, account, targetUser, rhost)
 		if err != nil {
-			pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("加载 prompt 模板失败: %v", err))
+			pamSyslog(pamh, C.LOG_ERR, msgf(msgPromptTemplateFailed, err))
 			return C.PAM_SERVICE_ERR
 		}
 		params.Prompt = rendered
 		pamDebugf(pamh, params, "using prompt template %s", params.PromptTemplate)
 	}
 	if params.GracePeriod > 0 && cfg.WithinGracePeriod(rhost, params.GracePeriod, time.Now()) {
-		pamSyslog(pamh, C.LOG_INFO, fmt.Sprintf("主机 %s 在宽限期内，跳过验证码", rhost))
+		pamSyslog(pamh, C.LOG_INFO, msgf(msgGraceSkip, rhost))
 		cfg.UpdateLoginRecord(rhost, time.Now())
 		pamDebugf(pamh, params, "grace period hit for host %s", rhost)
 		if rc := persistConfig(pamh, cfg, secretPath, params, account, state); rc != C.PAM_SUCCESS {
@@ -153,16 +152,16 @@ func runPamAuth(pamh *C.pam_handle_t, params pamcfg.Params) C.int {
 	if err != nil {
 		if errors.Is(err, authenticator.ErrInvalidCode) || errors.Is(err, config.ErrRateLimited) {
 			pamError(pamh, err.Error())
-			pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("用户 %s 验证失败: %v", targetUser, err))
+			pamSyslog(pamh, C.LOG_ERR, msgf(msgUserAuthFailed, targetUser, err))
 			return C.PAM_AUTH_ERR
 		}
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("验证失败: %v", err))
-		pamError(pamh, "内部错误")
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgAuthFailedGeneric, err))
+		pamError(pamh, msgf(msgInternalError))
 		return C.PAM_AUTH_ERR
 	}
 	if params.ForwardPass && remainder != "" {
 		if rc := setPamAuthtok(pamh, remainder); rc != C.PAM_SUCCESS {
-			pamSyslog(pamh, C.LOG_WARNING, "无法更新 PAM_AUTHTOK")
+			pamSyslog(pamh, C.LOG_WARNING, msgf(msgUpdateAuthtokFailed))
 		}
 	}
 	if params.GracePeriod > 0 && rhost != "" {
@@ -172,7 +171,7 @@ func runPamAuth(pamh *C.pam_handle_t, params pamcfg.Params) C.int {
 		return rc
 	}
 	pamDebugf(pamh, params, "authentication completed for %s", targetUser)
-	pamSyslog(pamh, C.LOG_INFO, fmt.Sprintf("用户 %s 验证成功 (%s)", targetUser, res.Type))
+	pamSyslog(pamh, C.LOG_INFO, msgf(msgUserAuthSuccess, targetUser, res.Type))
 	return C.PAM_SUCCESS
 }
 
@@ -270,8 +269,7 @@ func onlyDigits(s string) bool {
 
 func logDummyPassword(pamh *C.pam_handle_t, params pamcfg.Params, pw string) {
 	if len(pw) > 0 && pw[0] == '\b' {
-		pamSyslog(pamh, C.LOG_INFO,
-			"Dummy password supplied by PAM. Did OpenSSH 'PermitRootLogin <anything but yes>' or some other config block this login?")
+		pamSyslog(pamh, C.LOG_INFO, msgf(msgDummyPassword))
 	}
 }
 
@@ -373,7 +371,7 @@ func restorePrivileges(state *privilegeState) {
 
 func lookupAccount(name string) (*user.User, error) {
 	if name == "" {
-		return nil, fmt.Errorf("用户名为空")
+		return nil, fmt.Errorf("%s", msgf(msgEmptyUsername))
 	}
 	u, err := user.Lookup(name)
 	if err == nil {
@@ -393,23 +391,23 @@ func persistConfig(pamh *C.pam_handle_t, cfg *config.Config, path string, params
 	}
 	data, err := cfg.Bytes()
 	if err != nil {
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("序列化配置失败: %v", err))
-		pamError(pamh, "内部错误")
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgSerializeConfigFailed, err))
+		pamError(pamh, msgf(msgInternalError))
 		return C.PAM_AUTH_ERR
 	}
 	err = pamcfg.WriteConfig(account, path, data, params.AllowedPerm, state)
 	if err != nil {
 		if errors.Is(err, pamcfg.ErrSecretModified) {
-			pamSyslog(pamh, C.LOG_ERR, "密钥文件在处理期间发生变化，请重试")
-			pamError(pamh, "密钥文件发生变化，请重试")
+			pamSyslog(pamh, C.LOG_ERR, msgf(msgSecretChangedDuringProcess))
+			pamError(pamh, msgf(msgSecretChangedRetry))
 			return C.PAM_AUTH_ERR
 		}
 		if params.AllowReadonly && (errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EROFS) || errors.Is(err, syscall.EPERM)) {
-			pamSyslog(pamh, C.LOG_WARNING, fmt.Sprintf("只读模式，忽略写入失败: %v", err))
+			pamSyslog(pamh, C.LOG_WARNING, msgf(msgReadonlyWriteIgnored, err))
 			return C.PAM_SUCCESS
 		}
-		pamSyslog(pamh, C.LOG_ERR, fmt.Sprintf("写入 %s 失败: %v", path, err))
-		pamError(pamh, "更新 Google Authenticator 配置失败")
+		pamSyslog(pamh, C.LOG_ERR, msgf(msgWriteConfigFailed, path, err))
+		pamError(pamh, msgf(msgUpdateConfigFailed))
 		return C.PAM_AUTH_ERR
 	}
 	if err := applySelinuxContext(path); err != nil {

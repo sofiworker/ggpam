@@ -76,7 +76,7 @@ func loadPromptTemplate(path string) (string, error) {
 		return "", err
 	}
 	if len(data) > maxPromptTemplateSize {
-		return "", fmt.Errorf("prompt 模板超过 %d 字节", maxPromptTemplateSize)
+		return "", fmt.Errorf("%s", msgf(msgPromptTooLarge, maxPromptTemplateSize))
 	}
 	return strings.TrimRight(string(data), "\r\n"), nil
 }

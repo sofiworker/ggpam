@@ -56,3 +56,16 @@ make rpm
 VERSION=0.2.0 ./packaging/build_deb.sh
 RELEASE=2 ./packaging/build_rpm.sh
 ```
+
+### 安装/升级/卸载辅助脚本
+
+- `./packaging/manage_deb.sh <install|upgrade|reinstall|remove|purge> dist/gpam_<ver>_<arch>.deb`
+- `./packaging/manage_rpm.sh <install|upgrade|reinstall|remove> dist/gpam-<ver>-<release>.<arch>.rpm`
+
+安装/升级场景用 `install`/`upgrade`，重复安装同版本用 `reinstall`，卸载使用 `remove`（deb 还可 `purge`）。
+
+### Docker 内验证包
+
+`DEB_IMAGE=debian:12 RPM_IMAGE=rockylinux:9 ./packaging/verify_docker.sh`
+
+脚本会（默认）先构建 deb/rpm，再在对应容器里执行安装→重复安装→卸载流程，校验 CLI 与 PAM 模块文件的存在与清理；可通过 `SKIP_BUILD=true` 复用已有包。

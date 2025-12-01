@@ -36,6 +36,30 @@ Maintainer: gpam <devnull@example.com>
 Description: Google Authenticator PAM 模块的 Go 实现
 EOF_CTRL
 
+cat >"$STAGE/DEBIAN/postinst" <<'EOF_POSTINST'
+#!/bin/sh
+set -e
+if command -v ldconfig >/dev/null 2>&1; then
+	ldconfig
+fi
+exit 0
+EOF_POSTINST
+
+cat >"$STAGE/DEBIAN/postrm" <<'EOF_POSTRM'
+#!/bin/sh
+set -e
+case "$1" in
+remove|purge)
+	if command -v ldconfig >/dev/null 2>&1; then
+		ldconfig
+	fi
+	;;
+esac
+exit 0
+EOF_POSTRM
+
+chmod 0755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/postrm"
+
 install -m 0755 "$CLI_BIN" "$STAGE/usr/bin/google-authenticator"
 install -m 0644 "$PAM_SO" "$STAGE/lib/security/pam_google_authenticator.so"
 install -m 0644 "$PAM_HEADER" "$STAGE/usr/include/gpam/pam_google_authenticator.h"

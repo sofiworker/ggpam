@@ -44,6 +44,8 @@ Summary:        Google Authenticator PAM module (Go rewrite)
 License:        Apache-2.0
 URL:            https://github.com/example/gpam
 Source0:        gpam-${VERSION}.tar.gz
+Requires(post): /sbin/ldconfig
+Requires(postun): /sbin/ldconfig
 
 %description
 Go 语言重写的 google-authenticator-libpam，提供 CLI 与 PAM 模块。
@@ -58,6 +60,12 @@ Go 语言重写的 google-authenticator-libpam，提供 CLI 与 PAM 模块。
 install -D -m 0755 google-authenticator %{buildroot}/usr/bin/google-authenticator
 install -D -m 0644 pam_google_authenticator.so %{buildroot}/lib/security/pam_google_authenticator.so
 install -D -m 0644 pam_google_authenticator.h %{buildroot}/usr/include/gpam/pam_google_authenticator.h
+
+%post
+/sbin/ldconfig
+
+%postun
+/sbin/ldconfig
 
 %files
 /usr/bin/google-authenticator
