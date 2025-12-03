@@ -38,7 +38,7 @@ cp "$PAM_SO" "$SRC_DIR/pam_ggpam.so"
 cp "$PAM_HEADER" "$SRC_DIR/pam_ggpam.h"
 tar -C "$(dirname "$SRC_DIR")" -czf "${RPMROOT}/SOURCES/ggpam-${VERSION}.tar.gz" "ggpam-${VERSION}"
 
-SPEC_FILE="${RPMROOT}/SPECS/gpam.spec"
+SPEC_FILE="${RPMROOT}/SPECS/ggpam.spec"
 cat >"$SPEC_FILE" <<EOF_SPEC
 Name:           ggpam
 Version:        ${VERSION}
@@ -46,7 +46,7 @@ Release:        ${RELEASE}%{?dist}
 Summary:        Google Authenticator PAM module (Go rewrite)
 
 License:        Apache-2.0
-URL:            https://github.com/example/gpam
+URL:            https://github.com/sofiworker/ggpam
 Source0:        ggpam-${VERSION}.tar.gz
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
@@ -67,7 +67,7 @@ Go 语言重写的 google-authenticator-libpam，提供 CLI 与 PAM 模块。
 %install
 install -D -m 0755 ggpam %{buildroot}/usr/bin/ggpam
 install -D -m 0644 pam_ggpam.so %{buildroot}/lib/security/pam_ggpam.so
-install -D -m 0644 pam_ggpam.h %{buildroot}/usr/include/gpam/pam_ggpam.h
+install -D -m 0644 pam_ggpam.h %{buildroot}/usr/include/ggpam/pam_ggpam.h
 
 %post
 /sbin/ldconfig
@@ -78,7 +78,7 @@ install -D -m 0644 pam_ggpam.h %{buildroot}/usr/include/gpam/pam_ggpam.h
 %files
 /usr/bin/ggpam
 /lib/security/pam_ggpam.so
-/usr/include/gpam/pam_ggpam.h
+/usr/include/ggpam/pam_ggpam.h
 
 %changelog
 * $(date +"%a %b %d %Y") sofiworker <sofiworker@outlook.com> - ${VERSION}-${RELEASE}

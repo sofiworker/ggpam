@@ -24,7 +24,7 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN"
 mkdir -p "$STAGE/usr/bin"
 mkdir -p "$STAGE/lib/security"
-mkdir -p "$STAGE/usr/include/gpam"
+mkdir -p "$STAGE/usr/include/ggpam"
 
 cat >"$STAGE/DEBIAN/control" <<EOF_CTRL
 Package: ggpam
@@ -62,7 +62,7 @@ chmod 0755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/postrm"
 
 install -m 0755 "$CLI_BIN" "$STAGE/usr/bin/ggpam"
 install -m 0644 "$PAM_SO" "$STAGE/lib/security/pam_ggpam.so"
-install -m 0644 "$PAM_HEADER" "$STAGE/usr/include/gpam/pam_ggpam.h"
+install -m 0644 "$PAM_HEADER" "$STAGE/usr/include/ggpam/pam_ggpam.h"
 
 mkdir -p "$DIST_DIR"
 PACKAGE="${DIST_DIR}/ggpam_${VERSION}_${ARCH}.deb"
