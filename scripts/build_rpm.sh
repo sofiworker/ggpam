@@ -26,6 +26,10 @@ for dir in BUILD RPMS SOURCES SPECS SRPMS; do
 	mkdir -p "${RPMROOT}/${dir}"
 done
 
+TMP_DIR="${RPMROOT}/tmp"
+mkdir -p "$TMP_DIR"
+export TMPDIR="$TMP_DIR"
+
 SRC_DIR="${BUILD_ROOT}/src/ggpam-${VERSION}"
 rm -rf "$SRC_DIR"
 mkdir -p "$SRC_DIR"
@@ -46,6 +50,10 @@ URL:            https://github.com/example/gpam
 Source0:        ggpam-${VERSION}.tar.gz
 Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
+
+%global __brp_add_determinism /bin/true
+%global _enable_debug_packages 0
+%global debug_package %{nil}
 
 %description
 Go 语言重写的 google-authenticator-libpam，提供 CLI 与 PAM 模块。
@@ -77,7 +85,7 @@ install -D -m 0644 pam_ggpam.h %{buildroot}/usr/include/gpam/pam_ggpam.h
 - 初始构建
 EOF_SPEC
 
-rpmbuild --define "_topdir ${RPMROOT}" -bb "$SPEC_FILE"
+rpmbuild --define "_topdir ${RPMROOT}" --define "_tmppath ${TMP_DIR}" -bb "$SPEC_FILE"
 
 mkdir -p "$DIST_DIR"
 cp "${RPMROOT}/RPMS/${ARCH}/"*.rpm "$DIST_DIR"/

@@ -1,24 +1,31 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"ggpam/pkg/util"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
-	qrcode "github.com/skip2/go-qrcode"
+	"github.com/skip2/go-qrcode"
 	"github.com/spf13/cobra"
 
 	"ggpam/pkg/config"
-	i18n "ggpam/pkg/i18n"
+	"ggpam/pkg/i18n"
 	"ggpam/pkg/otp"
 )
 
 const (
-	defaultScratchCodes = 5
-	maxScratchCodes     = 10
+	defaultScratchCodes   = 5
+	maxScratchCodes       = 10
+	DefaultSecretFilename = ".ggpam_authenticator"
+	DefaultSecretFilePerm = 0o600
+	DefaultSecretDirPerm  = 0o700
+	EnvSecretPath         = "GPAM_SECRET_PATH"
 )
 
 type initOptions struct {
@@ -56,10 +63,6 @@ var initOpts = initOptions{
 	confirm:      true,
 }
 
-func msg(key string, args ...any) string {
-	return i18n.Msgf(key, args...)
-}
-
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: i18n.Resolve(i18n.MsgCmdInitShort),
@@ -70,6 +73,7 @@ var initCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+
 	initCmd.Flags().StringVar(&initOpts.path, "path", defaultSecretPath(), i18n.Resolve(i18n.MsgCliFlagPath))
 	initCmd.Flags().StringVarP(&initOpts.secretFile, "secret", "s", "", i18n.Resolve(i18n.MsgCliFlagSecret))
 	initCmd.Flags().BoolVarP(&initOpts.force, "force", "f", false, i18n.Resolve(i18n.MsgCliFlagForce))
@@ -110,12 +114,12 @@ func runInit(cmd *cobra.Command, opts initOptions) error {
 	if secretPath == "" {
 		secretPath = defaultSecretPath()
 	}
-	path, err := expandPath(secretPath)
+	path, err := util.ExpandPath(secretPath)
 	if err != nil {
 		return err
 	}
-	if fileExists(path) && !opts.force {
-		writeInfo("%s", msg(i18n.MsgCliFileExistsWarn, path))
+	if util.FileExists(path) && !opts.force {
+		fmt.Printf(msg(i18n.MsgCliFileExistsWarn, path))
 	}
 
 	useTOTP, err := determineMode(opts)
@@ -144,7 +148,7 @@ func runInit(cmd *cobra.Command, opts initOptions) error {
 		return fmt.Errorf("%s", msg(i18n.MsgCliScratchRange, maxScratchCodes))
 	}
 
-	secret, err := randomSecret(20)
+	secret, err := util.RandomSecret(20)
 	if err != nil {
 		return err
 	}
@@ -186,22 +190,33 @@ func runInit(cmd *cobra.Command, opts initOptions) error {
 
 	if !opts.force {
 		prompt := msg(i18n.MsgCliUpdateFilePrompt, path)
-		if !promptYesNo(prompt) {
-			writeInfo("%s", msg(i18n.MsgCliConfigCancelled, path))
+		if !util.PromptYesNo(prompt) {
+			fmt.Printf(msg(i18n.MsgCliConfigCancelled, path))
 			return nil
 		}
 	}
 
-	if err := ensureParent(path); err != nil {
+	if err := util.MkDirWithPerm(path, DefaultSecretDirPerm); err != nil {
 		return err
 	}
 	if err := cfg.Save(path, DefaultSecretFilePerm); err != nil {
 		return err
 	}
 	if !opts.quiet {
-		writeInfo("%s", i18n.Msgf(i18n.MsgCliConfigWritten, path))
+		fmt.Println(i18n.Msgf(i18n.MsgCliConfigWritten, path))
 	}
 	return nil
+}
+
+func defaultSecretPath() string {
+	if p := os.Getenv(EnvSecretPath); strings.TrimSpace(p) != "" {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join("~", DefaultSecretFilename)
+	}
+	return filepath.Join(home, DefaultSecretFilename)
 }
 
 func determineMode(opts initOptions) (bool, error) {
@@ -218,7 +233,7 @@ func determineMode(opts initOptions) (bool, error) {
 	case "hotp", "counter", "counter-based":
 		return false, nil
 	case "":
-		return promptYesNo(msg(i18n.MsgCliPromptTimeBased)), nil
+		return util.PromptYesNo(msg(i18n.MsgCliPromptTimeBased)), nil
 	default:
 		return false, fmt.Errorf("%s", msg(i18n.MsgCliUnknownMode, opts.mode))
 	}
@@ -237,7 +252,7 @@ func determineReuse(opts initOptions, useTOTP bool) (bool, error) {
 	if opts.allowReuse {
 		return false, nil
 	}
-	return promptYesNo(msg(i18n.MsgCliDisallowReusePrompt)), nil
+	return util.PromptYesNo(msg(i18n.MsgCliDisallowReusePrompt)), nil
 }
 
 func determineWindow(opts initOptions, useTOTP bool) (int, error) {
@@ -251,12 +266,12 @@ func determineWindow(opts initOptions, useTOTP bool) (int, error) {
 		return opts.windowSize, nil
 	}
 	if useTOTP {
-		if promptYesNo(msg(i18n.MsgCliTotpWindowPrompt)) {
+		if util.PromptYesNo(msg(i18n.MsgCliTotpWindowPrompt)) {
 			return 17, nil
 		}
 		return config.DefaultWindow, nil
 	}
-	if promptYesNo(msg(i18n.MsgCliHotpWindowPrompt)) {
+	if util.PromptYesNo(msg(i18n.MsgCliHotpWindowPrompt)) {
 		return 17, nil
 	}
 	return config.DefaultWindow, nil
@@ -287,7 +302,7 @@ func determineRateLimit(cmd *cobra.Command, opts initOptions) (*config.RateLimit
 		}
 		return &config.RateLimit{Attempts: opts.rateAttempts, Interval: opts.rateInterval}, nil
 	}
-	if promptYesNo(msg(i18n.MsgCliRateLimitPrompt)) {
+	if util.PromptYesNo(msg(i18n.MsgCliRateLimitPrompt)) {
 		return &config.RateLimit{Attempts: 3, Interval: 30 * time.Second}, nil
 	}
 	return nil, nil
@@ -311,7 +326,7 @@ func buildOtpauthURL(cfg *config.Config, opts initOptions) string {
 	default:
 		params["period"] = fmt.Sprintf("%d", cfg.Step())
 	}
-	builder := newOtpauthBuilder(label, issuer, params, cfg.Mode())
+	builder := otp.NewOTPAuthBuilder(label, issuer, params, cfg.Mode())
 	return builder.String()
 }
 
@@ -329,6 +344,7 @@ func defaultLabel() string {
 }
 
 func confirmCode(cfg *config.Config) error {
+	var stdinReader = bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print(msg(i18n.MsgCliEnterCode))
 		line, err := stdinReader.ReadString('\n')
@@ -422,10 +438,14 @@ func renderQRCode(data string, opts initOptions) {
 	inverse := opts.qrInverse || strings.Contains(mode, "inverse")
 	useUTF8 := opts.qrUTF8 || strings.Contains(mode, "utf8")
 	if useUTF8 {
-		fmt.Println(qrcodeToUTF8(qr.Bitmap(), inverse))
+		fmt.Println(util.QRCodeToUTF8(qr.Bitmap(), inverse))
 		return
 	}
 	fmt.Println(qr.ToSmallString(inverse))
+}
+
+func msg(key string, args ...any) string {
+	return i18n.Msgf(key, args...)
 }
 
 func max(a, b int) int {

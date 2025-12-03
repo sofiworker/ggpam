@@ -25,7 +25,7 @@ pam: $(PAM_SO)
 $(CLI_BINARY):
 	@mkdir -p $(BIN_DIR)
 	@echo "==> go build (CLI)"
-	go build -ldflags "$(LD_FLAGS)" -o $(CLI_BINARY) ./cmd/cli
+	CGO_ENABLED=0 go build -ldflags "$(LD_FLAGS)" -o $(CLI_BINARY) ./cmd/cli
 
 $(PAM_SO):
 	@mkdir -p $(BIN_DIR)

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"ggpam/pkg/util"
 
 	"github.com/spf13/cobra"
 
@@ -45,7 +46,7 @@ func runVerify(opts verifyOptions) error {
 	if opts.code == "" {
 		return errors.New(i18n.Resolve(i18n.MsgCliVerifyNeedCode))
 	}
-	path, err := expandPath(opts.path)
+	path, err := util.ExpandPath(opts.path)
 	if err != nil {
 		return err
 	}
@@ -84,11 +85,11 @@ func (v verifyResponder) OnSuccess(res authenticator.Result) {
 	}
 	switch res.Type {
 	case authenticator.ResultScratch:
-		writeInfo("%s", i18n.Resolve(i18n.MsgCliVerifyScratchUsed))
+		fmt.Println(i18n.Resolve(i18n.MsgCliVerifyScratchUsed))
 	case authenticator.ResultHOTP:
-		writeInfo(i18n.Resolve(i18n.MsgCliVerifyHOTPSuccess), res.Counter)
+		fmt.Printf(i18n.Resolve(i18n.MsgCliVerifyHOTPSuccess), res.Counter)
 	default:
-		writeInfo("%s", i18n.Resolve(i18n.MsgCliVerifyTOTPSuccess))
+		fmt.Printf(i18n.Resolve(i18n.MsgCliVerifyTOTPSuccess))
 	}
 }
 

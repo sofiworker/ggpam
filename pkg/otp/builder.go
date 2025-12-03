@@ -1,22 +1,21 @@
-package main
+package otp
 
 import (
 	"fmt"
+	"ggpam/pkg/config"
 	"net/url"
 	"sort"
-
-	"ggpam/pkg/config"
 )
 
-type otpauthBuilder struct {
+type OTPAuthBuilder struct {
 	label  string
 	issuer string
 	params map[string]string
 	mode   config.Mode
 }
 
-func newOtpauthBuilder(label, issuer string, params map[string]string, mode config.Mode) *otpauthBuilder {
-	return &otpauthBuilder{
+func NewOTPAuthBuilder(label, issuer string, params map[string]string, mode config.Mode) *OTPAuthBuilder {
+	return &OTPAuthBuilder{
 		label:  label,
 		issuer: issuer,
 		params: params,
@@ -24,7 +23,7 @@ func newOtpauthBuilder(label, issuer string, params map[string]string, mode conf
 	}
 }
 
-func (b *otpauthBuilder) String() string {
+func (b *OTPAuthBuilder) String() string {
 	query := url.Values{}
 	for k, v := range b.params {
 		if v == "" {

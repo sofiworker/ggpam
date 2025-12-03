@@ -331,7 +331,7 @@ func (c *Config) SecretBytes() ([]byte, error) {
 	enc := base32.StdEncoding.WithPadding(base32.NoPadding)
 	data, err := enc.DecodeString(normalized)
 	if err != nil {
-		return nil, fmt.Errorf("Base32 解码失败: %w", err)
+		return nil, fmt.Errorf("base32 decode failed: %v", err)
 	}
 	return data, nil
 }

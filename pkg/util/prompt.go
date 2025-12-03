@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 
 var stdinReader = bufio.NewReader(os.Stdin)
 
-func promptYesNo(msg string) bool {
+func PromptYesNo(msg string) bool {
 	fmt.Println()
 	for {
 		fmt.Printf("%s (y/n) ", msg)

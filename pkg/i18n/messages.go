@@ -105,6 +105,13 @@ const (
 	MsgCliVerifyScratchUsed     = "cliVerifyScratchUsed"
 	MsgCliVerifyHOTPSuccess     = "cliVerifyHOTPSuccess"
 	MsgCliVerifyTOTPSuccess     = "cliVerifyTOTPSuccess"
+
+	// 版本信息
+	MsgShowVersionShort = "showVersionShort"
+	MsgVersion          = "version"
+	MsgGitSha           = "gitSha"
+	MsgBuildTime        = "buildTime"
+	MsgGolangVersion    = "golangVersion"
 )
 
 var translations = map[string]map[string]string{
@@ -336,8 +343,8 @@ var translations = map[string]map[string]string{
 		"zh": "生成二维码失败: %v",
 	},
 	MsgCmdInitShort: {
-		"en": "Initialize ~/.google_authenticator config",
-		"zh": "初始化 ~/.google_authenticator 配置",
+		"en": "Initialize ~/.ggpam_authenticator config",
+		"zh": "初始化 ~/.ggpam_authenticator 配置",
 	},
 	MsgCmdVerifyShort: {
 		"en": "Verify one-time password or emergency code",
@@ -538,6 +545,26 @@ Options:
 	MsgCliLong: {
 		"en": "Google Authenticator CLI provides initialization and verification utilities.",
 		"zh": "Google Authenticator CLI，提供配置初始化与验证码验证功能。",
+	},
+	MsgShowVersionShort: {
+		"en": "Show Version",
+		"zh": "显示版本信息",
+	},
+	MsgVersion: {
+		"en": "Version",
+		"zh": "版本",
+	},
+	MsgGitSha: {
+		"en": "Git Commit",
+		"zh": "Git 提交",
+	},
+	MsgBuildTime: {
+		"en": "Build Time",
+		"zh": "构建时间",
+	},
+	MsgGolangVersion: {
+		"en": "Go Version",
+		"zh": "Go 版本",
 	},
 }
 

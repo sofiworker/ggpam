@@ -18,13 +18,6 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "exec cmd failed: %v\n", err)
-		os.Exit(1)
-	}
-}
-
 func init() {
 	rootCmd.Short = i18n.Resolve(i18n.MsgCliShort)
 	rootCmd.Long = i18n.Resolve(i18n.MsgCliLong)
@@ -38,4 +31,11 @@ func init() {
 
 func buildUsage() string {
 	return fmt.Sprintf(i18n.Resolve(i18n.MsgCliUsage), version.Version)
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "exec cmd failed: %v\n", err)
+		os.Exit(1)
+	}
 }

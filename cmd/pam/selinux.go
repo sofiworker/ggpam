@@ -1,7 +1,7 @@
 package main
 
 import (
-	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux"
 )
 
 const selinuxSecretType = "auth_home_t"

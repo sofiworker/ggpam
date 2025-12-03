@@ -1,10 +1,8 @@
-package main
+package util
 
-import (
-	"strings"
-)
+import "strings"
 
-func qrcodeToUTF8(bitmap [][]bool, inverse bool) string {
+func QRCodeToUTF8(bitmap [][]bool, inverse bool) string {
 	var sb strings.Builder
 	full := []rune("██")
 	empty := []rune("  ")

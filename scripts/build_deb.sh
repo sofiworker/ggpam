@@ -24,7 +24,7 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN"
 mkdir -p "$STAGE/usr/bin"
 mkdir -p "$STAGE/lib/security"
-mkdir -p "$STAGE/usr/include/ggpam"
+mkdir -p "$STAGE/usr/include/gpam"
 
 cat >"$STAGE/DEBIAN/control" <<EOF_CTRL
 Package: ggpam
@@ -65,6 +65,6 @@ install -m 0644 "$PAM_SO" "$STAGE/lib/security/pam_ggpam.so"
 install -m 0644 "$PAM_HEADER" "$STAGE/usr/include/gpam/pam_ggpam.h"
 
 mkdir -p "$DIST_DIR"
-PACKAGE="${DIST_DIR}/gpam_${VERSION}_${ARCH}.deb"
+PACKAGE="${DIST_DIR}/ggpam_${VERSION}_${ARCH}.deb"
 dpkg-deb --build "$STAGE" "$PACKAGE"
 echo "DEB 已生成: $PACKAGE"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"ggpam/pkg/i18n"
 
 	"github.com/spf13/cobra"
 
@@ -10,12 +11,12 @@ import (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "显示版本信息",
+	Short: i18n.Resolve(i18n.MsgShowVersionShort),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("版本: %s\n", version.Version)
-		fmt.Printf("Git 提交: %s\n", version.GitCommit)
-		fmt.Printf("构建时间: %s\n", version.BuildDate)
-		fmt.Printf("Go 版本: %s\n", version.GoVersion)
+		fmt.Printf(i18n.Resolve(i18n.MsgVersion)+": %s\n", version.Version)
+		fmt.Printf(i18n.Resolve(i18n.MsgGitSha)+": %s\n", version.GitCommit)
+		fmt.Printf(i18n.Resolve(i18n.MsgBuildTime)+": %s\n", version.BuildDate)
+		fmt.Printf(i18n.Resolve(i18n.MsgGolangVersion)+": %s\n", version.GoVersion)
 	},
 }
 
