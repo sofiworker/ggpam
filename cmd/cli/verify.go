@@ -87,9 +87,9 @@ func (v verifyResponder) OnSuccess(res authenticator.Result) {
 	case authenticator.ResultScratch:
 		fmt.Println(i18n.Resolve(i18n.MsgCliVerifyScratchUsed))
 	case authenticator.ResultHOTP:
-		fmt.Printf(i18n.Resolve(i18n.MsgCliVerifyHOTPSuccess), res.Counter)
+		fmt.Printf("%s", fmt.Sprintf(i18n.Resolve(i18n.MsgCliVerifyHOTPSuccess), res.Counter))
 	default:
-		fmt.Printf(i18n.Resolve(i18n.MsgCliVerifyTOTPSuccess))
+		fmt.Printf("%s", i18n.Resolve(i18n.MsgCliVerifyTOTPSuccess))
 	}
 }
 

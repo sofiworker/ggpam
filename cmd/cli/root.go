@@ -35,7 +35,7 @@ func buildUsage() string {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "exec cmd failed: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "%s\n", i18n.Msgf(i18n.MsgCliExecFailed, err))
 		os.Exit(1)
 	}
 }

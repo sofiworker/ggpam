@@ -55,7 +55,7 @@ func ParseParams(args []string) (Params, error) {
 		case strings.HasPrefix(arg, "prompt_file=") || strings.HasPrefix(arg, "prompt_template="):
 			parts := strings.SplitN(arg, "=", 2)
 			if len(parts) != 2 || parts[1] == "" {
-				return params, fmt.Errorf("prompt_file 缺少路径")
+				return params, fmt.Errorf("prompt_file requires a path")
 			}
 			params.PromptTemplate = parts[1]
 		case strings.HasPrefix(arg, "user="):
@@ -64,14 +64,14 @@ func ParseParams(args []string) (Params, error) {
 			value := strings.TrimPrefix(arg, "allowed_perm=")
 			perm, err := strconv.ParseUint(value, 8, 32)
 			if err != nil || perm == 0 {
-				return params, fmt.Errorf("非法 allowed_perm: %s", value)
+				return params, fmt.Errorf("invalid allowed_perm %q", value)
 			}
 			params.AllowedPerm = os.FileMode(perm)
 		case strings.HasPrefix(arg, "grace_period="):
 			value := strings.TrimPrefix(arg, "grace_period=")
 			secs, err := strconv.Atoi(value)
 			if err != nil || secs < 0 {
-				return params, fmt.Errorf("grace_period 必须为非负整数秒: %s", value)
+				return params, fmt.Errorf("grace_period must be a non-negative integer seconds: %q", value)
 			}
 			params.GracePeriod = time.Duration(secs) * time.Second
 		case arg == "try_first_pass":
@@ -95,7 +95,7 @@ func ParseParams(args []string) (Params, error) {
 		case arg == "allow_readonly":
 			params.AllowReadonly = true
 		default:
-			return params, fmt.Errorf("未知参数 %s", arg)
+			return params, fmt.Errorf("unknown parameter %q", arg)
 		}
 	}
 	if params.ForwardPass && !params.PromptOverride {

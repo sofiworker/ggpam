@@ -22,11 +22,11 @@ const (
 )
 
 var (
-	errInvalidScratch  = errors.New("无效的应急码行")
-	errInvalidOption   = errors.New("无法解析的配置选项")
-	errMissingSecret   = errors.New("缺少共享密钥")
-	errFileTooLarge    = errors.New("配置文件超过 64KB 限制")
-	errRateLimitFormat = errors.New("RATE_LIMIT 选项格式错误")
+	errInvalidScratch  = errors.New("invalid scratch code line")
+	errInvalidOption   = errors.New("unrecognized config option")
+	errMissingSecret   = errors.New("missing shared secret")
+	errFileTooLarge    = errors.New("config file exceeds 64KB limit")
+	errRateLimitFormat = errors.New("RATE_LIMIT option is malformed")
 )
 
 type Mode int
@@ -78,23 +78,27 @@ type Config struct {
 func Load(path string) (*Config, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stat config %s: %w", path, err)
 	}
 	if fi.Size() > maxFileSize {
 		return nil, errFileTooLarge
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open config %s: %w", path, err)
 	}
 	defer f.Close()
-	return Parse(f)
+	cfg, err := Parse(f)
+	if err != nil {
+		return nil, fmt.Errorf("parse config %s: %w", path, err)
+	}
+	return cfg, nil
 }
 
 func Parse(r io.Reader) (*Config, error) {
 	data, err := io.ReadAll(io.LimitReader(r, maxFileSize+1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read config: %w", err)
 	}
 	if len(data) > maxFileSize {
 		return nil, errFileTooLarge
@@ -111,7 +115,7 @@ func Parse(r io.Reader) (*Config, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scan config: %w", err)
 	}
 	if len(lines) == 0 {
 		return nil, errMissingSecret
@@ -173,20 +177,20 @@ func (c *Config) parseOption(payload string) error {
 	case key == "HOTP_COUNTER":
 		n, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
 		if err != nil {
-			return fmt.Errorf("HOTP_COUNTER 解析失败: %w", err)
+			return fmt.Errorf("parse HOTP_COUNTER: %w", err)
 		}
 		c.Options.HOTPConfigured = true
 		c.Options.HOTPCounter = n
 	case key == "STEP_SIZE":
 		step, err := strconv.Atoi(strings.TrimSpace(value))
 		if err != nil || step < 1 || step > 60 {
-			return fmt.Errorf("STEP_SIZE 不合法: %s", value)
+			return fmt.Errorf("invalid STEP_SIZE %q (expected 1..60)", value)
 		}
 		c.Options.StepSize = step
 	case key == "WINDOW_SIZE":
 		win, err := strconv.Atoi(strings.TrimSpace(value))
 		if err != nil || win < 1 || win > 100 {
-			return fmt.Errorf("WINDOW_SIZE 不合法: %s", value)
+			return fmt.Errorf("invalid WINDOW_SIZE %q (expected 1..100)", value)
 		}
 		c.Options.WindowSize = win
 	case key == "RATE_LIMIT":
@@ -202,7 +206,7 @@ func (c *Config) parseOption(payload string) error {
 			for _, v := range values {
 				ts, err := strconv.ParseInt(v, 10, 64)
 				if err != nil {
-					return fmt.Errorf("DISALLOW_REUSE 时间戳无效: %s", v)
+					return fmt.Errorf("invalid DISALLOW_REUSE timestamp %q", v)
 				}
 				c.Options.DisallowedTimestamps = append(c.Options.DisallowedTimestamps, ts)
 			}
@@ -213,7 +217,7 @@ func (c *Config) parseOption(payload string) error {
 		}
 		skew, err := strconv.Atoi(value)
 		if err != nil {
-			return fmt.Errorf("TIME_SKEW 无效: %s", value)
+			return fmt.Errorf("invalid TIME_SKEW %q", value)
 		}
 		c.Options.TimeSkew = skew
 	case key == "RESETTING_TIME_SKEW":
@@ -241,19 +245,19 @@ func (c *Config) parseOption(payload string) error {
 
 func parseLastLogin(value, key string) (LoginRecord, int, error) {
 	if len(key) != 5 || key[:4] != "LAST" {
-		return LoginRecord{}, 0, fmt.Errorf("未知字段 %s", key)
+		return LoginRecord{}, 0, fmt.Errorf("unknown field %s", key)
 	}
 	idx, err := strconv.Atoi(key[4:])
 	if err != nil || idx < 0 || idx > 9 {
-		return LoginRecord{}, 0, fmt.Errorf("LAST 索引无效: %s", key)
+		return LoginRecord{}, 0, fmt.Errorf("invalid LAST index %s", key)
 	}
 	chunks := strings.Fields(value)
 	if len(chunks) < 2 {
-		return LoginRecord{}, 0, fmt.Errorf("LAST 行格式错误: %s", value)
+		return LoginRecord{}, 0, fmt.Errorf("invalid LAST line %s", value)
 	}
 	when, err := strconv.ParseInt(chunks[len(chunks)-1], 10, 64)
 	if err != nil {
-		return LoginRecord{}, 0, fmt.Errorf("LAST 时间无效: %w", err)
+		return LoginRecord{}, 0, fmt.Errorf("invalid LAST timestamp: %w", err)
 	}
 	host := strings.Join(chunks[:len(chunks)-1], " ")
 	return LoginRecord{Host: host, When: when}, idx, nil
@@ -271,15 +275,15 @@ func parseSkewSamples(value string) ([]SkewSample, error) {
 			split++
 		}
 		if split == 0 || split >= len(token) {
-			return nil, fmt.Errorf("RESETTING_TIME_SKEW 解析失败: %s", token)
+			return nil, fmt.Errorf("parse RESETTING_TIME_SKEW entry %q failed", token)
 		}
 		ts, err := strconv.ParseInt(token[:split], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("RESETTING_TIME_SKEW 时间戳无效: %s", token)
+			return nil, fmt.Errorf("invalid RESETTING_TIME_SKEW timestamp %q", token)
 		}
 		skewVal, err := strconv.Atoi(token[split:])
 		if err != nil {
-			return nil, fmt.Errorf("RESETTING_TIME_SKEW 偏移无效: %s", token)
+			return nil, fmt.Errorf("invalid RESETTING_TIME_SKEW skew %q", token)
 		}
 		samples = append(samples, SkewSample{Timestamp: ts, Skew: skewVal})
 	}
@@ -331,7 +335,7 @@ func (c *Config) SecretBytes() ([]byte, error) {
 	enc := base32.StdEncoding.WithPadding(base32.NoPadding)
 	data, err := enc.DecodeString(normalized)
 	if err != nil {
-		return nil, fmt.Errorf("base32 decode failed: %v", err)
+		return nil, fmt.Errorf("base32 decode failed: %w", err)
 	}
 	return data, nil
 }
@@ -425,10 +429,10 @@ func (c *Config) Save(path string, perm os.FileMode) error {
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, perm); err != nil {
-		return err
+		return fmt.Errorf("write temp config %s: %w", tmp, err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		return err
+		return fmt.Errorf("replace config %s: %w", path, err)
 	}
 	c.Dirty = false
 	return nil
@@ -487,7 +491,7 @@ func (c *Config) RecordUsedTimestamp(ts int64) {
 	c.Dirty = true
 }
 
-var ErrRateLimited = errors.New("登录尝试过于频繁")
+var ErrRateLimited = errors.New("too many login attempts")
 
 func (c *Config) EnforceRateLimit(now time.Time) error {
 	if c.Options.RateLimit == nil {
@@ -525,7 +529,7 @@ func (c *Config) CheckReuse(ts int64) error {
 	}
 	for _, blocked := range c.Options.DisallowedTimestamps {
 		if blocked == ts {
-			return fmt.Errorf("尝试重复使用时间窗口 %d", ts)
+			return fmt.Errorf("reusing TOTP window %d", ts)
 		}
 	}
 	return nil
@@ -539,7 +543,7 @@ func (c *Config) RecordSkewObservation(ts int64, skew int) bool {
 	if len(samples) > 0 {
 		last := samples[len(samples)-1]
 		if last.Timestamp+int64(last.Skew) == ts+int64(skew) {
-			// 同一个滑动窗口，无需重复记录
+			// Same sliding window, skip duplicate record.
 			return false
 		}
 	}

@@ -19,9 +19,9 @@ const (
 )
 
 var (
-	ErrInvalidCode = errors.New("验证码不匹配")
-	ErrNoSecret    = errors.New("配置缺少共享密钥")
-	ErrModeUnknown = errors.New("配置未启用 HOTP/TOTP")
+	ErrInvalidCode = errors.New("verification code does not match")
+	ErrNoSecret    = errors.New("shared secret is missing")
+	ErrModeUnknown = errors.New("HOTP/TOTP mode is not configured")
 )
 
 type VerifyOptions struct {
@@ -62,7 +62,7 @@ func (a *Authenticator) now() time.Time {
 func (a *Authenticator) VerifyCode(cfg *config.Config, raw string, opts VerifyOptions) (Result, error) {
 	responder := a.responder()
 	if cfg == nil {
-		err := errors.New("配置为空")
+		err := errors.New("config is nil")
 		responder.OnError(err)
 		return Result{}, err
 	}
@@ -82,7 +82,7 @@ func (a *Authenticator) VerifyCode(cfg *config.Config, raw string, opts VerifyOp
 		return Result{}, ErrInvalidCode
 	}
 	if len(token) != 6 && len(token) != 8 {
-		err := fmt.Errorf("验证码长度必须为 6 或 8 位: %s", token)
+		err := fmt.Errorf("code length must be 6 or 8 digits: %s", token)
 		responder.OnError(err)
 		return Result{}, err
 	}

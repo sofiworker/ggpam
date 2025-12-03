@@ -119,7 +119,7 @@ func runInit(cmd *cobra.Command, opts initOptions) error {
 		return err
 	}
 	if util.FileExists(path) && !opts.force {
-		fmt.Printf(msg(i18n.MsgCliFileExistsWarn, path))
+		fmt.Print(msg(i18n.MsgCliFileExistsWarn, path))
 	}
 
 	useTOTP, err := determineMode(opts)
@@ -191,7 +191,7 @@ func runInit(cmd *cobra.Command, opts initOptions) error {
 	if !opts.force {
 		prompt := msg(i18n.MsgCliUpdateFilePrompt, path)
 		if !util.PromptYesNo(prompt) {
-			fmt.Printf(msg(i18n.MsgCliConfigCancelled, path))
+			fmt.Print(msg(i18n.MsgCliConfigCancelled, path))
 			return nil
 		}
 	}

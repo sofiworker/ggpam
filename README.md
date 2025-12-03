@@ -1,71 +1,82 @@
-## 项目简介
+# ggpam
 
-`gpam` 以 Go 语言重写 `google-authenticator-libpam`，涵盖 CLI、核心 OTP 逻辑与 PAM 模块：
+## 项目概述
+- Go 版本的 Google Authenticator 实现，涵盖 CLI 与 PAM 模块，复刻原版速率限制、时间偏移自适应、应急码等行为。
+- 代码模块化：配置解析（`pkg/config`）、验证器（`pkg/authenticator`/`pkg/otp`）、日志（`pkg/logging`）、PAM 参数解析与文件校验（`pkg/pam`）。
+- 产物：静态 CLI 可执行文件 `ggpam`，以及可直接放入 PAM 的 `pam_ggpam.so`/`pam_ggpam.h`。
+- 国际化：面向用户的提示走 i18n（支持中英文）；日志与错误消息保持英文便于程序化处理。
 
-- `pkg/config`：解析 `~/.google_authenticator` 文件，复刻速率限制、时间漂移自适应、应急码等功能；
-- `pkg/authenticator` 与 `pkg/otp`：提供 TOTP/HOTP 计算、应急码验证，供 CLI 与 PAM 复用；
-- `cmd/google-authenticator`：基于 Cobra 的命令行，包含 `init`、`verify`、`version` 等子命令，支持通过 `-ldflags` 注入版本、Git、构建时间、Go 版本信息；
-- `cmd/pam_google_authenticator`：cgo 实现的 PAM 模块，提供 `pam_sm_authenticate`/`pam_sm_setcred` 并复用 Go 逻辑；
-- 构建脚本、依赖检查、Deb/RPM 打包集中于 `scripts/` 与 `packaging/`。
+## 仓库结构
+- `cmd/cli`：Cobra CLI，含 `init`/`verify`/`version`。
+- `cmd/pam`：PAM 入口，使用 cgo 暴露 `pam_sm_authenticate`/`pam_sm_setcred`。
+- `pkg/config`：解析/序列化 `~/.ggpam_authenticator`（兼容 `.google_authenticator`）格式。
+- `pkg/authenticator`、`pkg/otp`：TOTP/HOTP 计算、应急码验证。
+- `pkg/pam`：PAM 参数、密钥文件校验、持久化。
+- `pkg/logging`：可配置文件+stderr 输出，支持环境变量。
+- `scripts/`：依赖检查、构建、打包（deb/rpm）、Docker 内验证脚本。
 
-## 开发与构建
-
+## 快速开始
 ```bash
-# 依赖检查
+# 安装依赖（gcc/clang、pam 开发头、go1.18+）
 ./scripts/check_deps.sh
 
-# 代码格式化 & 测试
-make fmt
-make test
+# 构建 CLI 与 PAM
+make build            # 生成 bin/ggpam 和 bin/pam_ggpam.so/h
 
-# 构建 CLI 与 PAM 模块（默认注入 VERSION/GIT/DATE/GO 版本信息）
-make build
-# 或执行
-./scripts/build.sh
+# 运行测试
+GOCACHE=$(pwd)/.cache go test ./...   # 避免 /root/.cache 权限问题
+
+# 查看版本信息
+./bin/ggpam version
 ```
 
-构建完成后：
-
-- `bin/google-authenticator`：CLI，可用 `google-authenticator version` 查看注入信息；
-- `bin/pam_google_authenticator.so/.h`：PAM 模块共享对象与头文件（`go build -buildmode=c-shared` 生成）。
-
-## 使用示例
-
+## CLI 使用
 ```bash
-# 初始化配置
-google-authenticator init --mode totp --path ~/.google_authenticator
-# 验证一次性密码（flag 或参数均可）
-google-authenticator verify --code 123456
-# 打印版本信息
-google-authenticator version
+# 初始化配置（默认 ~/.ggpam_authenticator，支持交互确认）
+./bin/ggpam init --mode totp --path ~/.ggpam_authenticator
+
+# 验证一次性密码（可用 --code 或直接传参数）
+./bin/ggpam verify --code 123456
+
+# 静默验证（仅退出码反映结果）
+./bin/ggpam verify --quiet --code 123456
 ```
+常用参数：
+- `--mode totp|hotp`、`--time-based/--counter-based`：选择模式。
+- `--window-size`、`--step-size`：窗口与步长。
+- `--rate-limit/--rate-time/--no-rate-limit`：速率限制。
+- `--emergency-codes`：生成应急码数量。
+- `--no-confirm`：跳过写文件确认（自动化场景）。
+- `--qr-mode`/`--qr-inverse`/`--qr-utf8`：二维码输出样式。
 
-## 打包
+## PAM 模块
+1) 构建后将 `bin/pam_ggpam.so`/`bin/pam_ggpam.h` 安装到系统 PAM 目录（如 `/lib64/security`），并在目标服务的 pam.d 文件里添加：
+   ```
+   auth required pam_ggpam.so secret=/path/to/.ggpam_authenticator try_first_pass grace_period=30
+   ```
+2) 重要参数（见 `pkg/pam/params.go`）：
+   - `secret=`：密钥文件模板，支持 `%u`/`%h`/`~`；默认 `~/.ggpam_authenticator`。
+   - `try_first_pass`/`use_first_pass`/`forward_pass`：与现有密码交互的方式。
+   - `prompt_template=`：自定义提示模板（可用 `{{.User}}`/`{{.Rhost}}` 等变量）。
+   - `grace_period=`：宽限期（秒），允许同一主机在窗口内跳过验证。
+   - `allowed_perm=`、`no_strict_owner`：文件权限与所有者校验。
+   - `allow_readonly`：只读场景下忽略写入失败。
+   - `debug`：输出调试日志。
 
-```bash
-# 生成 deb/rpm（默认版本 0.1.0，可通过 env 覆盖 VERSION/RELEASE）
-make package
-# 或单独执行
-make deb
-make rpm
-```
+## 日志与配置
+- 环境变量：
+  - `GGPAM_LOG_LEVEL`：`debug`/`info`/`warn`/`error`（默认 `info`）。
+  - `GGPAM_LOG_FILE`：日志文件路径；未设置且 `DefaultHomeLogging=true` 时会写入 `$HOME/ggpam.log`，并同时输出到 stderr。
+- PAM 调用会自动将日志写入 syslog，同步到 `pkg/logging` 输出。
 
-产物位于 `dist/`，包含 CLI、PAM `.so` 与头文件。示例：
+## 构建与打包
+- `make fmt` / `make test` / `make lint`：格式化、测试、vet。
+- `make deb` / `make rpm`：调用 `scripts/build_deb.sh` / `scripts/build_rpm.sh` 生成包，产物位于 `dist/`。
+- `./scripts/build.sh`：单次构建 CLI 与 PAM。
+- `./scripts/verify_docker.sh`：在 Docker 中验证 deb/rpm 安装/卸载流程（需设置 `DEB_IMAGE`/`RPM_IMAGE`，可用 `SKIP_BUILD=true` 复用现有包）。
+- 版本信息通过 `-ldflags` 注入（`Version`/`GitCommit`/`BuildDate`/`GoVersion`），`make build` 已内置。
 
-```bash
-VERSION=0.2.0 ./packaging/build_deb.sh
-RELEASE=2 ./packaging/build_rpm.sh
-```
-
-### 安装/升级/卸载辅助脚本
-
-- `./packaging/manage_deb.sh <install|upgrade|reinstall|remove|purge> dist/gpam_<ver>_<arch>.deb`
-- `./packaging/manage_rpm.sh <install|upgrade|reinstall|remove> dist/gpam-<ver>-<release>.<arch>.rpm`
-
-安装/升级场景用 `install`/`upgrade`，重复安装同版本用 `reinstall`，卸载使用 `remove`（deb 还可 `purge`）。
-
-### Docker 内验证包
-
-`DEB_IMAGE=debian:12 RPM_IMAGE=rockylinux:9 ./packaging/verify_docker.sh`
-
-脚本会（默认）先构建 deb/rpm，再在对应容器里执行安装→重复安装→卸载流程，校验 CLI 与 PAM 模块文件的存在与清理；可通过 `SKIP_BUILD=true` 复用已有包。
+## 开发指引
+- Go 1.18+，遵循 idiomatic Go（tabs 缩进，错误上下文包装，避免 panic）。
+- 涉及阻塞操作请将 `context` 作为首参；日志/错误保持英文，展示给用户的文本通过 i18n。
+- 提交前运行 `gofmt`、`go test ./...`，如依赖变更请执行 `go mod tidy`。

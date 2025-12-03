@@ -50,6 +50,7 @@ const (
 	MsgCliRateTimeRange         = "cliRateTimeRange"
 	MsgCliConfigCancelled       = "cliConfigCancelled"
 	MsgCliConfigWritten         = "cliConfigWritten"
+	MsgCliExecFailed            = "cliExecFailed"
 	MsgCliEnterCode             = "cliEnterCode"
 	MsgCliCodeSkipped           = "cliCodeSkipped"
 	MsgCliCodeInvalidDigits     = "cliCodeInvalidDigits"
@@ -277,6 +278,10 @@ var translations = map[string]map[string]string{
 	MsgCliConfigWritten: {
 		"en": "Config written to %s",
 		"zh": "已写入配置 %s",
+	},
+	MsgCliExecFailed: {
+		"en": "Command failed: %v",
+		"zh": "命令执行失败: %v",
 	},
 	MsgCliUpdateFilePrompt: {
 		"en": "Do you want me to update your \"%s\" file?",
