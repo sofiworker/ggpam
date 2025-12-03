@@ -17,6 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     container: rockylinux:8
     steps:
+      - name: Install base dependencies
+        run: |
+          yum -y install epel-release
+          yum -y install gcc make git findutils pam-devel pkgconfig rpm-build dpkg tar gzip
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -28,12 +33,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install build dependencies
-        run: |
-          yum -y install epel-release
-          yum -y install gcc make git findutils pam-devel pkgconfig rpm-build dpkg tar gzip
+      - name: Allow workspace as safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Set version
+        working-directory: ${{ github.workspace }}
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
@@ -43,9 +47,11 @@ jobs:
           fi
 
       - name: Run tests
+        working-directory: ${{ github.workspace }}
         run: go test ./...
 
       - name: Build packages
+        working-directory: ${{ github.workspace }}
         run: make package
 
       - name: Upload artifacts
