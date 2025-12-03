@@ -3,8 +3,8 @@ package authenticator
 import (
 	"time"
 
-	"gpam/pkg/config"
-	"gpam/pkg/otp"
+	"ggpam/pkg/config"
+	"ggpam/pkg/otp"
 )
 
 type Algorithm interface {

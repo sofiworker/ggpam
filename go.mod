@@ -1,4 +1,4 @@
-module gpam
+module ggpam
 
 go 1.24.0
 

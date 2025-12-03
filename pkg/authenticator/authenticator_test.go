@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"gpam/pkg/config"
-	"gpam/pkg/otp"
+	"ggpam/pkg/config"
+	"ggpam/pkg/otp"
 )
 
 func TestVerifyTOTP(t *testing.T) {

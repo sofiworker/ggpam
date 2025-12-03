@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"gpam/pkg/config"
+	"ggpam/pkg/config"
 )
 
 type FileState struct {

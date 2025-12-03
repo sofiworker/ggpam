@@ -28,7 +28,7 @@ need_cmd go
 need_cmd gcc
 need_cmd pkg-config
 need_cmd tar
-need_cmd dpkg-deb
+#need_cmd dpkg-deb
 need_cmd rpmbuild
 
 check_go_version

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"gpam/pkg/config"
+	"ggpam/pkg/config"
 )
 
 type ResultType string
